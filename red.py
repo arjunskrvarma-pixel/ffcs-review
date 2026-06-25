@@ -1,45 +1,3 @@
-"""
-Reddit Teacher Review Scraper - SELENIUM VERSION (no API keys)
-================================================================
-Drives an actual Chrome browser using YOUR logged-in Reddit account/session
-to search a subreddit for mentions of a teacher and gauge sentiment from
-the comments. Uses old.reddit.com because its plain HTML is far more
-reliable to scrape than new Reddit's shadow-DOM web components.
-
------------------------------------------------------------------------
-SETUP (one-time, ~2 minutes)
------------------------------------------------------------------------
-1. Install dependencies:
-       pip install selenium nltk
-
-2. Make sure you have Google Chrome installed (regular desktop Chrome).
-   Selenium 4.10+ auto-downloads the matching chromedriver for you --
-   no manual driver setup needed.
-
-3. Run it:
-       python reddit_teacher_scraper_selenium.py r/YourCollegeSubreddit "Professor Smith" "Smith"
-
-4. A Chrome window will open. The FIRST time you run this:
-   - It'll pause and ask you to log into Reddit manually in that window.
-   - Once logged in, press Enter in your terminal to continue.
-   - Your login is saved in a local browser profile folder (./chrome_profile)
-     so you won't have to log in again on future runs.
-
------------------------------------------------------------------------
-IMPORTANT NOTES
------------------------------------------------------------------------
-- This is slower than the API version (it's loading real web pages) and
-  more fragile (if Reddit changes old.reddit.com's HTML, selectors may
-  need updating).
-- Automated browsing is against Reddit's terms of service regardless of
-  whether you use your own logged-in account or not. Keep request volume
-  reasonable (this script already adds delays between page loads).
-- Large comment threads only get partially expanded (controlled by
-  MAX_LOAD_MORE_CLICKS below) to keep runtime reasonable -- increase it
-  if you want more thoroughness at the cost of speed.
------------------------------------------------------------------------
-"""
-
 import os
 import sys
 import csv
@@ -471,6 +429,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-    #python red.py r/Vit "Professor Manikandan" "Manikandan"
