@@ -1,8 +1,8 @@
-# Reddit Teacher Review Scraper 📊
+# Reddit Teacher Review Scraper
 
 A Python-based web scraper that uses Selenium to automate a Chrome browser, search a specific subreddit for mentions of a teacher or professor, and perform sentiment analysis on the posts and comments.
 
-## ✨ Features
+## Features
 * **No API Keys Required:** Uses an actual browser session, bypassing the need for Reddit API access.
 * **Smart Initial Detection:** Automatically detects initials next to a professor's name (e.g., differentiating between "Manikandan N" and "Manikandan G" automatically) and creates separate summaries for each.
 * **Sentiment Analysis:** Utilizes NLTK's VADER lexicon to score each comment as Positive, Negative, or Neutral.
@@ -11,7 +11,7 @@ A Python-based web scraper that uses Selenium to automate a Chrome browser, sear
 
 ---
 
-## 🚀 Setup Instructions (One-time)
+## Setup Instructions (One-time)
 
 1. **Install Dependencies:**
    Make sure you have Python installed, then install the required libraries:
@@ -34,7 +34,7 @@ A Python-based web scraper that uses Selenium to automate a Chrome browser, sear
 
 ---
 
-## 💻 Usage
+## Usage
 
 Run the script by providing the subreddit (with or without `r/`) and the name(s) or variants you want to search for.
 
@@ -48,7 +48,7 @@ python red.py r/Vit Manikandan
 python red.py Vit "Professor Smith" "John Smith" "Smith"
 ```
 
-### 🧠 How Smart Grouping Works:
+### How Smart Grouping Works:
 If you search for a generic name like "Manikandan", the script will automatically read the context of the comments to find initials. It will group the results and output:
 * A summary for **Manikandan N**
 * A summary for **Manikandan G**
@@ -56,7 +56,7 @@ If you search for a generic name like "Manikandan", the script will automaticall
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 * **Speed:** This script loads actual web pages instead of using an API, so it is naturally slower. Large comment threads are only partially expanded to keep runtime reasonable.
 * **Fragility:** Web scrapers rely on HTML structure. This scraper targets `old.reddit.com` as it is much more reliable to scrape than the modern React-based Reddit. If Reddit changes the HTML of old.reddit.com, selectors in the code may need updating.
 * **Rate Limiting:** Automated browsing is technically against Reddit's Terms of Service. This script includes built-in `time.sleep()` delays between page loads to be polite. Please keep your request volume reasonable to avoid temporary IP bans.
