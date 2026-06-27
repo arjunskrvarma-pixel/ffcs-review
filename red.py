@@ -12,7 +12,7 @@ try:
     from selenium import webdriver
     from selenium.webdriver.common.by import By
     from selenium.webdriver.chrome.options import Options
-    from selenium.common.exceptions import NoSuchElementException, TimeoutException
+    from selenium.common.exceptions import NoSuchElementException
 except ImportError:
     sys.exit("Missing dependency. Run: pip install selenium nltk")
 
@@ -33,16 +33,56 @@ except ImportError:
 PROFILE_DIR = os.path.abspath("./chrome_profile")  # keeps you logged in between runs
 MAX_SEARCH_PAGES = 3          # pages of search results to page through per name (~25 results/page)
 MAX_LOAD_MORE_CLICKS = 5      # "load more comments" clicks per post (higher = more thorough, slower)
-PAGE_LOAD_DELAY = 2           # seconds to wait after navigating, be polite / let JS settle
+PAGE_LOAD_DELAY = 1           # seconds to wait after navigating, be polite / let JS settle
 HEADLESS = False              # keep False so you can log in manually the first time
 
+# Boilerplate "official discussion thread" pinned posts/comments carry no
+# real opinion about the professor - they're just sub-rules. Always treat
+# these as neutral, no matter what name/wording shows up in them.
+OFFICIAL_THREAD_PATTERN = re.compile(
+    r"this is the official discussion thread for faculty.*?"
+    r"share your reviews and experiences below.*?"
+    r"all further posts about this faculty will be redirected here",
+    re.IGNORECASE | re.DOTALL,
+)
 
-def setup_driver():
+
+def is_official_thread_text(text):
+    return bool(OFFICIAL_THREAD_PATTERN.search(text))
+
+
+# Student slang that vanilla VADER scores as neutral but that students use
+# to mean "easy grader / chill professor" (positive) or "harsh grader /
+# brutal professor" (negative). Added on top of the default lexicon.
+CUSTOM_LEXICON = {
+    "easy": 1.8,
+    "chill": 1.9,
+    "lenient": 1.7,
+    "laidback": 1.7,
+    "laid-back": 1.7,
+    "decent": 1.2,
+    "goat": 2.5,
+    "fire": 1.8,
+    "free": 0.6,        # "free A", "free marks" etc. mild positive nudge
+    "curve": 1.0,
+    "savage": -1.8,
+    "brutal": -2.2,
+    "harsh": -1.8,
+    "strict": -1.0,
+    "ruthless": -2.2,
+    "savage af": -2.0,
+    "menace": -1.5,
+    "trash": -2.5,
+    "scam": -2.2,
+}
+
+
+def setup_driver(profile_dir=PROFILE_DIR, headless=HEADLESS):
     options = Options()
-    options.add_argument(f"--user-data-dir={PROFILE_DIR}")
+    options.add_argument(f"--user-data-dir={profile_dir}")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--start-maximized")
-    if HEADLESS:
+    if headless:
         options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
     return driver
@@ -69,21 +109,21 @@ def ensure_login(driver):
 def get_teacher_categories(text, names):
     categories = set()
     text_lower = text.lower()
-    
+
     explicit_matches = set()
     for name in names:
         if name.lower() in text_lower:
             explicit_matches.add(name.strip().title())
-            
+
     for name in names:
         base = name.lower()
         clean_name = name.replace("Professor ", "").replace("Prof. ", "").strip().title()
-        
+
         # Trailing initial
         pattern = r'\b' + re.escape(base) + r'\s+([a-z])\b'
         for match in re.finditer(pattern, text_lower):
             categories.add(f"{clean_name} {match.group(1).upper()}")
-            
+
         # Preceding initial
         pattern_pre = r'\b([a-z])\.?\s+' + re.escape(base) + r'\b'
         for match in re.finditer(pattern_pre, text_lower):
@@ -94,14 +134,14 @@ def get_teacher_categories(text, names):
 
     if categories:
         return list(categories)
-        
+
     if explicit_matches:
         best_match = sorted(list(explicit_matches), key=len, reverse=True)[0]
         if len(best_match.split()) == 1:
             return [f"{best_match} (Unspecified)"]
         else:
             return [best_match]
-            
+
     return []
 
 
@@ -164,6 +204,10 @@ def expand_comments(driver, max_clicks):
 
 
 def scrape_post(driver, url, names):
+    """Scrape a post's title/self-text AND every comment, matching each
+    against the teacher name variants independently. A post can mention
+    one professor in the title and a totally different one in a comment -
+    both get captured here."""
     mentions = []
     full_url = url if "?" in url else url + "?limit=500"
     driver.get(full_url)
@@ -192,7 +236,7 @@ def scrape_post(driver, url, names):
                 "created": "",
             })
 
-    # --- expand & scrape comments ---
+    # --- expand & scrape comments (every comment is checked independently) ---
     expand_comments(driver, MAX_LOAD_MORE_CLICKS)
 
     comment_divs = driver.find_elements(By.CSS_SELECTOR, "div.comment")
@@ -202,10 +246,10 @@ def scrape_post(driver, url, names):
             body = body_el.text.strip()
         except NoSuchElementException:
             continue
-            
+
         if not body:
             continue
-            
+
         categories = get_teacher_categories(body, names)
         if not categories:
             continue
@@ -269,7 +313,16 @@ def dedupe_mentions(mentions):
 
 def analyze_sentiment(mentions):
     sia = SentimentIntensityAnalyzer()
+    sia.lexicon.update(CUSTOM_LEXICON)
+
     for m in mentions:
+        # Pinned "official discussion thread" boilerplate carries no actual
+        # opinion about the professor - always neutral, skip scoring it.
+        if is_official_thread_text(m["text"]):
+            m["sentiment_score"] = 0.0
+            m["sentiment"] = "neutral"
+            continue
+
         score = sia.polarity_scores(m["text"])["compound"]
         m["sentiment_score"] = score
         if score >= 0.25:
@@ -323,7 +376,7 @@ def print_summary(mentions, teacher_label):
             print(f"  ({m['score']}) {m['text'][:150]}")
             print(f"     {m['permalink']}")
 
-    print("\nFull details saved to CSV — read the raw comments yourself, "
+    print("\nFull details saved to CSV - read the raw comments yourself, "
           "sentiment analysis on short slangy text isn't perfect.")
 
 
@@ -371,7 +424,7 @@ def update_summary_csv(filename, new_row):
     with open(filename, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        for row in rows.values():
+        for row in sorted(rows.values(), key=lambda item: item["teacher"].lower()):
             writer.writerow(row)
 
     print(f"Updated master summary: {filename} ({len(rows)} professor(s) total)")
@@ -393,14 +446,28 @@ def save_csv(mentions, filename):
 
 
 def main():
+    global MAX_SEARCH_PAGES, MAX_LOAD_MORE_CLICKS, PAGE_LOAD_DELAY
+
     parser = argparse.ArgumentParser(description="Scrape a subreddit (via real browser/account) for sentiment about a teacher.")
     parser.add_argument("subreddit", help="Subreddit name, with or without r/ prefix")
     parser.add_argument("names", nargs="+", help="Teacher name(s) / variants to search for")
+    parser.add_argument("--headless", action="store_true", help="Run Chrome without showing a browser window")
+    parser.add_argument("--pages", type=int, default=MAX_SEARCH_PAGES, help="Search result pages to scan per name")
+    parser.add_argument("--load-more", type=int, default=MAX_LOAD_MORE_CLICKS, help="Comment expansion clicks per post")
+    parser.add_argument("--delay", type=float, default=PAGE_LOAD_DELAY, help="Seconds to wait after page loads")
+    parser.add_argument("--profile-dir", default=PROFILE_DIR, help="Chrome profile directory for saved Reddit login")
+    parser.add_argument("--output-dir", default=".", help="Directory for generated CSV files")
     args = parser.parse_args()
 
     subreddit_name = args.subreddit.replace("r/", "").replace("/r/", "").strip()
+    output_dir = os.path.abspath(args.output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
-    driver = setup_driver()
+    MAX_SEARCH_PAGES = max(1, args.pages)
+    MAX_LOAD_MORE_CLICKS = max(0, args.load_more)
+    PAGE_LOAD_DELAY = max(0.0, args.delay)
+
+    driver = setup_driver(os.path.abspath(args.profile_dir), args.headless)
     try:
         ensure_login(driver)
         mentions = collect_mentions(driver, subreddit_name, args.names)
@@ -413,18 +480,18 @@ def main():
     grouped = defaultdict(list)
     for m in mentions:
         grouped[m["teacher"]].append(m)
-        
+
     if not grouped:
         print_summary([], args.names[0])
-        
+
     for teacher_label, teacher_mentions in grouped.items():
         print_summary(teacher_mentions, teacher_label)
 
         safe_name = "".join(c if c.isalnum() else "_" for c in teacher_label)
-        save_csv(teacher_mentions, f"{safe_name}_reddit_mentions.csv")
+        save_csv(teacher_mentions, os.path.join(output_dir, f"{safe_name}_reddit_mentions.csv"))
 
         summary_row = build_summary_row(teacher_mentions, teacher_label)
-        update_summary_csv("teacher_review_summary.csv", summary_row)
+        update_summary_csv(os.path.join(output_dir, "teacher_review_summary.csv"), summary_row)
 
 
 if __name__ == "__main__":

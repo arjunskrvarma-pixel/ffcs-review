@@ -1,62 +1,69 @@
 # Reddit Teacher Review Scraper
 
-A Python-based web scraper that uses Selenium to automate a Chrome browser, search a specific subreddit for mentions of a teacher or professor, and perform sentiment analysis on the posts and comments.
+A Python scraper that uses Selenium to search old Reddit for professor or teacher mentions, then scores each matched post/comment with NLTK VADER sentiment analysis.
 
 ## Features
-* **No API Keys Required:** Uses an actual browser session, bypassing the need for Reddit API access.
-* **Smart Initial Detection:** Automatically detects initials next to a professor's name (e.g., differentiating between "Manikandan N" and "Manikandan G" automatically) and creates separate summaries for each.
-* **Sentiment Analysis:** Utilizes NLTK's VADER lexicon to score each comment as Positive, Negative, or Neutral.
-* **CSV Export:** Generates individual CSV files for each professor detected, and maintains a master summary file (`teacher_review_summary.csv`).
-* **Persistent Login:** Saves your Chrome profile locally so you only need to log in to Reddit once!
 
----
+* Uses a real Chrome session, so no Reddit API key is required.
+* Keeps a local Chrome profile in `chrome_profile` so you only need to log in once.
+* Searches multiple name variants in one run.
+* Groups generic names by nearby initials, such as `Manikandan N` vs `Manikandan G`.
+* Treats official discussion-thread boilerplate as neutral.
+* Adds a small student-slang sentiment lexicon for words like `chill`, `lenient`, `strict`, and `harsh`.
+* Exports per-professor CSV files and a master `teacher_review_summary.csv`.
 
-## Setup Instructions (One-time)
+## Setup
 
-1. **Install Dependencies:**
-   Make sure you have Python installed, then install the required libraries:
-   ```bash
-   pip install selenium nltk
-   ```
+Install Python dependencies:
 
-2. **Browser Requirements:**
-   Make sure you have Google Chrome installed on your computer. Selenium 4.10+ will automatically download the matching ChromeDriver for you, so no manual driver setup is needed!
+```bash
+pip install selenium nltk
+```
 
-3. **First Run & Login:**
-   Run the script for the first time:
-   ```bash
-   python red.py r/YourCollegeSubreddit "Professor Name"
-   ```
-   A Chrome window will open. The **FIRST** time you run this:
-   * It will pause and ask you to log into your Reddit account manually in that window.
-   * Once logged in, press `Enter` in your terminal to continue.
-   * Your session is saved locally (in a `./chrome_profile` folder), so you won't need to log in again on future runs.
-
----
+Make sure Google Chrome is installed. Selenium Manager can download the matching ChromeDriver automatically for current Selenium versions.
 
 ## Usage
 
-Run the script by providing the subreddit (with or without `r/`) and the name(s) or variants you want to search for.
+Basic run:
 
-**Basic Example:**
 ```bash
-python red.py r/Vit Manikandan
+python red.py r/YourSubreddit "Professor Name"
 ```
 
-**Multiple Name Variants:**
+Multiple name variants:
+
 ```bash
-python red.py Vit "Professor Smith" "John Smith" "Smith"
+python red.py VIT "Manikandan" "Professor Manikandan" "Manikandan N"
 ```
 
-### How Smart Grouping Works:
-If you search for a generic name like "Manikandan", the script will automatically read the context of the comments to find initials. It will group the results and output:
-* A summary for **Manikandan N**
-* A summary for **Manikandan G**
-* A summary for **Manikandan (Unspecified)** (if no initial was found)
+Useful options:
 
----
+```bash
+python red.py VIT Manikandan --pages 5 --load-more 8 --delay 1.5 --output-dir results
+```
 
-## Important Notes
-* **Speed:** This script loads actual web pages instead of using an API, so it is naturally slower. Large comment threads are only partially expanded to keep runtime reasonable.
-* **Fragility:** Web scrapers rely on HTML structure. This scraper targets `old.reddit.com` as it is much more reliable to scrape than the modern React-based Reddit. If Reddit changes the HTML of old.reddit.com, selectors in the code may need updating.
-* **Rate Limiting:** Automated browsing is technically against Reddit's Terms of Service. This script includes built-in `time.sleep()` delays between page loads to be polite. Please keep your request volume reasonable to avoid temporary IP bans.
+Available flags:
+
+* `--headless` runs Chrome without a visible browser window.
+* `--pages` controls how many search-result pages to scan per name.
+* `--load-more` controls how many "load more comments" clicks happen per post.
+* `--delay` controls the delay after page loads.
+* `--profile-dir` changes where the Chrome login profile is stored.
+* `--output-dir` changes where CSV outputs are written.
+
+## First Login
+
+On the first non-headless run, Chrome opens old Reddit and the script pauses. Log in manually, then return to the terminal and press Enter. The login session is reused from the profile directory on later runs.
+
+## Output
+
+For every detected professor group, the script writes:
+
+* `<Professor_Name>_reddit_mentions.csv`
+* `teacher_review_summary.csv`
+
+The summary CSV is updated in place, with one row per professor.
+
+## Notes
+
+This scraper targets `old.reddit.com`, which is more stable for Selenium scraping than modern Reddit. Keep the delays reasonable and avoid high-volume runs.
