@@ -382,8 +382,8 @@ def print_summary(mentions, teacher_label):
 
 def build_summary_row(mentions, teacher_label):
     total = len(mentions)
-    pos = sum(1 for m in mentions if m["sentiment"] == "positive")
-    neg = sum(1 for m in mentions if m["sentiment"] == "negative")
+    pos = [m for m in mentions if m["sentiment"] == "positive"]
+    neg = [m for m in mentions if m["sentiment"] == "negative"]
     neu = sum(1 for m in mentions if m["sentiment"] == "neutral")
     avg_score = sum(m["sentiment_score"] for m in mentions) / total if total else 0
 
@@ -394,14 +394,27 @@ def build_summary_row(mentions, teacher_label):
     else:
         verdict = "Mixed/Neutral"
 
+    def get_top_link(mention_list):
+        if not mention_list:
+            return ""
+        def score_key(m):
+            try:
+                return int(str(m["score"]).split()[0])
+            except (ValueError, IndexError):
+                return 0
+        top = max(mention_list, key=score_key)
+        return top.get("permalink", "")
+
     return {
         "teacher": teacher_label,
         "total_mentions": total,
-        "positive": pos,
-        "negative": neg,
+        "positive": len(pos),
+        "negative": len(neg),
         "neutral": neu,
         "avg_sentiment_score": round(avg_score, 3),
         "overall_verdict": verdict,
+        "top_positive_link": get_top_link(pos),
+        "top_negative_link": get_top_link(neg),
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -410,7 +423,8 @@ def update_summary_csv(filename, new_row):
     """One row per professor; updates in place across runs instead of
     appending duplicate rows for the same professor."""
     fieldnames = ["teacher", "total_mentions", "positive", "negative",
-                  "neutral", "avg_sentiment_score", "overall_verdict", "last_updated"]
+                  "neutral", "avg_sentiment_score", "overall_verdict",
+                  "top_positive_link", "top_negative_link", "last_updated"]
     rows = {}
 
     if os.path.exists(filename):
