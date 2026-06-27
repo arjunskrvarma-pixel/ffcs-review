@@ -67,3 +67,4 @@ The summary CSV is updated in place, with one row per professor.
 ## Notes
 
 This scraper targets `old.reddit.com`, which is more stable for Selenium scraping than modern Reddit. Keep the delays reasonable and avoid high-volume runs.
+This project aggregates publicly available Reddit discussions and applies automated sentiment analysis using NLTK VADER. Results are approximate and should not be interpreted as factual ratings of any individual. Reddit opinions may be biased or unrepresentative.
